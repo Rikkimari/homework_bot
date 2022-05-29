@@ -1,6 +1,6 @@
+import logging
 import os
 import time
-import logging
 from http import HTTPStatus
 
 import requests
@@ -22,7 +22,7 @@ PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
-RETRY_TIME = 5
+RETRY_TIME = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 
@@ -34,7 +34,7 @@ HOMEWORK_STATUSES = {
 
 
 def send_message(bot, message):
-    """Отправляет сообщение"""
+    """Отправляет сообщение."""
     try:
         bot = bot
         message = message
@@ -46,7 +46,7 @@ def send_message(bot, message):
 
 
 def get_api_answer(current_timestamp):
-    """Получает словарь с данными о домашней работе"""
+    """Получает словарь с данными о домашней работе."""
     timestamp = current_timestamp
     params = {'from_date': timestamp}
     headers = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
@@ -58,16 +58,25 @@ def get_api_answer(current_timestamp):
 
 
 def check_response(response):
-    """Проверяет корректность полученных данных"""
-    if isinstance(response, dict):
-        return response['homeworks']
+    """Проверяет корректность ответа API."""
+    if type(response) is not dict:
+        logger.error('Неверный формат данных')
+        raise TypeError('Неверный формат данных')
+    try:
+        homework = response.get('homeworks')
+    except IndexError:
+        logger.error('Нет домашних работ')
+    if type(homework) is not list:
+        logger.error('Неверный формат данных')
+        raise TypeError('Неверный формат данных')
+    return homework
 
 
 def parse_status(homework):
-    """Извлекает статус домашней работы из словаря"""
-    homework_name = homework[0]['homework_name']
-    homework_status = homework[0]['status']
-    if 'homework_name' not in homework[0]:
+    """Извлекает статус домашней работы из словаря."""
+    homework_name = homework['homework_name']
+    homework_status = homework['status']
+    if 'homework_name' not in homework:
         logger.error('Работы с таким именем не обнаружено')
         raise KeyError('Работы с таким именем не обнаружено')
     if homework_status not in HOMEWORK_STATUSES:
@@ -88,7 +97,6 @@ def check_tokens():
 
 def main():
     """Основная логика работы бота."""
-
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     current_timestamp = 0
     check_tokens()
@@ -102,7 +110,7 @@ def main():
                 logger.debug('Статус работы не изменился')
                 time.sleep(RETRY_TIME)
                 continue
-            message = parse_status(homework)
+            message = parse_status(homework[0])
             send_message(bot, message)
             current_timestamp = response.get('current_date')
             time.sleep(RETRY_TIME)
