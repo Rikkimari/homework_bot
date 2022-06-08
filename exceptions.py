@@ -1,0 +1,2 @@
+class NotForSendError(Exception):
+    pass

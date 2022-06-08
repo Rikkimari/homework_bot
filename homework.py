@@ -3,13 +3,14 @@ import os
 import sys
 import time
 from http import HTTPStatus
-from json import JSONDecodeError
 
 import requests
 import telegram
 from dotenv import load_dotenv
 from requests import RequestException, Response
 from telegram import TelegramError
+
+from exceptions import NotForSendError
 
 load_dotenv()
 
@@ -35,22 +36,20 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
     except TelegramError as error:
-        raise TelegramError('Сообщение с текстом: '
-                            f'{message} не отправлено ошибка:{error}')
+        raise NotForSendError('Сообщение с текстом: '
+                              f'{message} не отправлено ошибка:{error}')
     else:
         logger.info('Сообщение успешно отправлено')
 
 
 def get_api_answer(current_timestamp):
     """Получает словарь с данными о домашней работе."""
-    response_params = {'ENDPOINT': ENDPOINT,
+    response_params = {'url': ENDPOINT,
                        'headers': {'Authorization':
                                    f'OAuth {PRACTICUM_TOKEN}'},
                        'params': {'from_date': current_timestamp}}
     try:
-        response = requests.get(**{'url': response_params.get('ENDPOINT'),
-                                   'headers': response_params.get('headers'),
-                                   'params': response_params.get('params')})
+        response = requests.get(**response_params)
         if response.status_code != HTTPStatus.OK:
             Response.raise_for_status(response)
 
@@ -60,8 +59,9 @@ def get_api_answer(current_timestamp):
                                 f' {response_params}'))
     try:
         return response.json()
-    except JSONDecodeError:
-        raise
+    except ValueError:
+        raise ValueError('запроса к API с параметрами'
+                         f' {response_params} вернул невалидный json')
 
 
 def check_response(response):
@@ -75,7 +75,7 @@ def check_response(response):
     if type(homeworks) is not list:
         raise TypeError('По ключу homeworks находится не список')
     if response.get('current_date') is None:
-        logger.error('В ответе от API отсутствует ключ current_date')
+        raise NotForSendError('В ответе от API отсутствует ключ current_date')
     if not isinstance((response.get('current_date')), int):
         raise TypeError('По ключу current_date находится не число')
     return homeworks
@@ -120,7 +120,9 @@ def main():
             message = parse_status(homework[0])
             send_message(bot, message)
             current_timestamp = response.get('current_date')
-
+        except NotForSendError as error:
+            message = f'Сбой в работе программы: {error}'
+            logger.error(message, exc_info=True)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logger.error(message, exc_info=True)
