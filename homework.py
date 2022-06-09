@@ -3,6 +3,7 @@ import os
 import sys
 import time
 from http import HTTPStatus
+from json import JSONDecodeError
 
 import requests
 import telegram
@@ -59,8 +60,8 @@ def get_api_answer(current_timestamp):
                                 f' {response_params}'))
     try:
         return response.json()
-    except ValueError:
-        raise ValueError('запроса к API с параметрами'
+    except JSONDecodeError as error:
+        raise ValueError(f'Ошибка {error} запрос к API с параметрами'
                          f' {response_params} вернул невалидный json')
 
 
@@ -77,7 +78,7 @@ def check_response(response):
     if response.get('current_date') is None:
         raise NotForSendError('В ответе от API отсутствует ключ current_date')
     if not isinstance((response.get('current_date')), int):
-        raise TypeError('По ключу current_date находится не число')
+        raise NotForSendError('По ключу current_date находится не число')
     return homeworks
 
 
