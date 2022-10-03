@@ -18,6 +18,10 @@ https://practicum.yandex.ru/api/user_api/homework_statuses/
 * работа возвращена для исправления ошибок
 * работа принята
 
+## Технологии 
+
+Python 3.7
+
 ## Запуск на ПК
 Клонируем проект:
 
